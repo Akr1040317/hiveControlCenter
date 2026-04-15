@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { getAdminSession } from "@/lib/auth/guards";
+import { getOverviewMetrics } from "@/lib/metrics/overview";
 
 export async function GET() {
   const session = await getAdminSession();
@@ -8,14 +9,16 @@ export async function GET() {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  return NextResponse.json({
-    generatedAt: new Date().toISOString(),
-    summary: {
-      revenue30d: 0,
-      activeLearners: 0,
-      campaignSends: 0,
-      jobFailures24h: 0,
-    },
-    note: "Metrics pipeline scaffolded. Connect Firebase + Stripe data sources next.",
-  });
+  try {
+    const metrics = await getOverviewMetrics();
+    return NextResponse.json(metrics);
+  } catch (error) {
+    return NextResponse.json(
+      {
+        error: "Failed to load metrics.",
+        details: error instanceof Error ? error.message : "Unknown error",
+      },
+      { status: 500 },
+    );
+  }
 }

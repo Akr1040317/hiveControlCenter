@@ -5,6 +5,8 @@ import { assertPermission, getAdminSession } from "@/lib/auth/guards";
 import { logAdminAction } from "@/lib/audit/logger";
 import { isEmailAllowlisted } from "@/lib/auth/allowlist";
 import { upsertAdminUser } from "@/lib/users/adminUsers";
+import { assertRateLimit } from "@/lib/security/rateLimit";
+import { assertValidCsrf } from "@/lib/security/csrf";
 
 const grantAccessSchema = z.object({
   uid: z.string().min(1),
@@ -23,6 +25,25 @@ const grantAccessSchema = z.object({
 });
 
 export async function POST(request: Request) {
+  try {
+    assertRateLimit(request, "users-grant-access", {
+      limit: 80,
+      windowMs: 60_000,
+    });
+    await assertValidCsrf(request);
+  } catch (error) {
+    if (error instanceof Error && error.message === "RATE_LIMITED") {
+      return NextResponse.json(
+        { error: "Too many requests. Please retry in a minute." },
+        { status: 429 },
+      );
+    }
+    return NextResponse.json(
+      { error: "Missing or invalid CSRF token." },
+      { status: 403 },
+    );
+  }
+
   const session = await getAdminSession();
   if (!session) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -44,6 +65,14 @@ export async function POST(request: Request) {
 
   const payload = parsed.data;
   const normalizedEmail = payload.email.toLowerCase();
+  const readOnlyMode = process.env.ADMIN_CENTER_READ_ONLY_MODE === "true";
+
+  if (readOnlyMode) {
+    return NextResponse.json(
+      { error: "Admin center is in read-only mode." },
+      { status: 423 },
+    );
+  }
 
   if (!isEmailAllowlisted(normalizedEmail)) {
     return NextResponse.json(

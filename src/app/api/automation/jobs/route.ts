@@ -4,6 +4,8 @@ import { assertPermission, getAdminSession } from "@/lib/auth/guards";
 import { logAdminAction } from "@/lib/audit/logger";
 import { createDryRunJob } from "@/lib/jobs/engine";
 import { getAdminDb } from "@/lib/firebase/admin";
+import { assertRateLimit } from "@/lib/security/rateLimit";
+import { assertValidCsrf } from "@/lib/security/csrf";
 
 type CreateJobBody = {
   runbookId?: string;
@@ -29,6 +31,22 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
+  try {
+    assertRateLimit(request, "automation-jobs", { limit: 100, windowMs: 60_000 });
+    await assertValidCsrf(request);
+  } catch (error) {
+    if (error instanceof Error && error.message === "RATE_LIMITED") {
+      return NextResponse.json(
+        { error: "Too many requests. Please retry in a minute." },
+        { status: 429 },
+      );
+    }
+    return NextResponse.json(
+      { error: "Missing or invalid CSRF token." },
+      { status: 403 },
+    );
+  }
+
   const session = await getAdminSession();
   if (!session) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

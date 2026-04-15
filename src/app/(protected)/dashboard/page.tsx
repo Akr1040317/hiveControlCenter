@@ -1,35 +1,84 @@
-export default function DashboardPage() {
+import { getOverviewMetrics } from "@/lib/metrics/overview";
+
+function asCount(value: number | null | undefined) {
+  if (typeof value !== "number") {
+    return "—";
+  }
+  return value.toLocaleString();
+}
+
+export default async function DashboardPage() {
+  let metrics: Awaited<ReturnType<typeof getOverviewMetrics>>["summary"] | null =
+    null;
+
+  try {
+    metrics = (await getOverviewMetrics()).summary;
+  } catch {
+    metrics = null;
+  }
+
+  const revenueDisplay =
+    typeof metrics?.revenue30d === "number"
+      ? `$${metrics.revenue30d.toLocaleString()}`
+      : "Pending";
+
   const kpis = [
-    { label: "Revenue (30d)", value: "$0.00", hint: "Connect billing sources" },
-    { label: "Active Learners", value: "0", hint: "Wire metrics endpoint" },
-    { label: "Campaign Sends", value: "0", hint: "Bee Ready + webinar sends" },
-    { label: "Job Failures", value: "0", hint: "From automationJobRuns" },
+    {
+      label: "Revenue (30d)",
+      value: revenueDisplay,
+      hint: "Stripe aggregation lands in Commerce phase.",
+    },
+    {
+      label: "Total Users",
+      value: asCount(metrics?.totalUsers),
+      hint: "Count from Firestore users collection.",
+    },
+    {
+      label: "Active Learners",
+      value: asCount(metrics?.activeLearners),
+      hint: "Users with active status.",
+    },
+    {
+      label: "Admin Users",
+      value: asCount(metrics?.adminUsers),
+      hint: "Access records in adminUsers.",
+    },
+    {
+      label: "Failed Jobs (24h)",
+      value: asCount(metrics?.failedJobs24h),
+      hint: "automationJobRuns with failed status.",
+    },
+    {
+      label: "Audit Events (24h)",
+      value: asCount(metrics?.recentAuditEvents24h),
+      hint: "adminActionAuditLogs events last 24 hours.",
+    },
   ];
 
   return (
     <section className="space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold text-zinc-900">
+        <h1 className="text-2xl font-semibold text-white">
           Executive Command Dashboard
         </h1>
-        <p className="mt-1 text-sm text-zinc-600">
-          Phase A shell with secure auth and module routing in place.
+        <p className="mt-1 text-sm hive-subtle">
+          Live Firestore-backed metrics for the next control-center phase.
         </p>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
         {kpis.map((kpi) => (
           <article
             key={kpi.label}
-            className="rounded-xl border border-zinc-200 bg-white p-4"
+                className="hive-card p-4"
           >
-            <p className="text-xs uppercase tracking-wide text-zinc-500">
+            <p className="hive-section-label">
               {kpi.label}
             </p>
-            <p className="mt-2 text-2xl font-semibold text-zinc-900">
+            <p className="mt-2 text-2xl font-semibold text-white">
               {kpi.value}
             </p>
-            <p className="mt-1 text-xs text-zinc-500">{kpi.hint}</p>
+            <p className="mt-1 text-xs hive-subtle">{kpi.hint}</p>
           </article>
         ))}
       </div>

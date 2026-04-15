@@ -8,7 +8,14 @@ export type RunbookDefinition = {
   id: string;
   name: string;
   description: string;
-  category: "campaigns" | "bee_ready" | "users" | "commerce" | "ops";
+  category:
+    | "campaigns"
+    | "bee_ready"
+    | "users"
+    | "commerce"
+    | "ops"
+    | "content"
+    | "tooling";
   requiredPermissions: AdminPermission[];
   riskLevel: RiskLevel;
   supportsDryRun: boolean;
@@ -64,6 +71,70 @@ export const RUNBOOKS: RunbookDefinition[] = [
     parameterSchema: z.object({
       emails: z.array(z.string().email()).min(1),
       entitlementPlan: z.string().min(2),
+      idempotencyKey: z.string().min(8),
+    }),
+  },
+  {
+    id: "tools.quiz.addWords",
+    name: "Add words to quizzes",
+    description:
+      "Runs script-backed quiz-word ingestion with validation and dry-run summary.",
+    category: "tooling",
+    requiredPermissions: ["automation.run"],
+    riskLevel: "high",
+    supportsDryRun: true,
+    requiresApproval: true,
+    parameterSchema: z.object({
+      sourceFile: z.string().min(3),
+      targetQuiz: z.string().min(1),
+      idempotencyKey: z.string().min(8),
+    }),
+  },
+  {
+    id: "tools.pronunciations.generate",
+    name: "Generate pronunciations",
+    description:
+      "Runs pronunciation generation pipeline for selected word sets.",
+    category: "tooling",
+    requiredPermissions: ["automation.run"],
+    riskLevel: "medium",
+    supportsDryRun: true,
+    requiresApproval: false,
+    parameterSchema: z.object({
+      wordSetRef: z.string().min(1),
+      provider: z.enum(["google_tts", "manual"]).default("google_tts"),
+      idempotencyKey: z.string().min(8),
+    }),
+  },
+  {
+    id: "tools.wordInfo.generate",
+    name: "Generate word information",
+    description:
+      "Builds and syncs word-level metadata (definitions, examples, CSV exports).",
+    category: "tooling",
+    requiredPermissions: ["automation.run"],
+    riskLevel: "medium",
+    supportsDryRun: true,
+    requiresApproval: false,
+    parameterSchema: z.object({
+      source: z.enum(["csv", "json", "firestore"]),
+      targetCollection: z.string().min(1),
+      idempotencyKey: z.string().min(8),
+    }),
+  },
+  {
+    id: "tools.learningTrack.rebuild",
+    name: "Rebuild learning tracks",
+    description:
+      "Regenerates learning track path structures and validates content links.",
+    category: "content",
+    requiredPermissions: ["automation.run"],
+    riskLevel: "high",
+    supportsDryRun: true,
+    requiresApproval: true,
+    parameterSchema: z.object({
+      trackId: z.string().min(1),
+      cohort: z.string().min(1),
       idempotencyKey: z.string().min(8),
     }),
   },

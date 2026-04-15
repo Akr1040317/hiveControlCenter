@@ -17,12 +17,12 @@ export default async function ProtectedLayout({
     <div className="flex min-h-screen flex-col md:flex-row">
       <AppSidebar />
       <div className="flex flex-1 flex-col">
-        <header className="flex items-center justify-between border-b border-zinc-200 bg-white px-5 py-3">
+        <header className="flex items-center justify-between border-b border-[#1e1e34] bg-[#121220] px-5 py-3">
           <div>
-            <p className="text-xs uppercase tracking-wide text-zinc-500">
+            <p className="hive-section-label">
               Signed in
             </p>
-            <p className="text-sm font-medium text-zinc-800">{session.email}</p>
+            <p className="text-sm font-medium text-[#ececff]">{session.email}</p>
           </div>
           <SignOutButton />
         </header>

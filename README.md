@@ -9,7 +9,11 @@ Current implementation baseline:
 - Server-verified allowlist session creation
 - Protected route group for admin modules
 - RBAC and audit-log scaffolding
+- CSRF token validation + rate limiting for mutating routes
 - Automation runbook catalog + dry-run job API
+- Firestore-backed dashboard metrics and platform-user lookup
+- Content Management module shell (Word of Day, articles, lessons, videos, webinars, quizzes, tracks)
+- Tools Center script inventory from `hivewebsite/scripts` and `hiveTools`
 
 ## Run locally
 
@@ -36,11 +40,17 @@ Open [http://localhost:3000](http://localhost:3000).
 
 - `/sign-in` - Google Firebase sign-in
 - `/dashboard` - executive control center shell
-- `/users`, `/campaigns`, `/automation`, `/settings` - module placeholders
+- `/content-management` - content control modules
+- `/tools-center` - scripts and tooling catalog
+- `/users`, `/campaigns`, `/automation`, `/settings` - admin modules
 - `/api/auth/session` - verifies Firebase ID token, enforces allowlist, sets
   secure cookie
+- `/api/auth/csrf` - issues CSRF token for authenticated mutations
 - `/api/users/search` - admin user lookup from Firestore `adminUsers`
+- `/api/users/platform-search` - lookup users from main `users` collection
 - `/api/users/grant-access` - audited admin role/status grant/update endpoint
+- `/api/content/modules` - content management module definitions
+- `/api/tools/scripts` - script inventory from hivewebsite + hiveTools mapping
 - `/api/automation/jobs` - dry-run-first runbook execution scaffold
 
 ## Deploy to Vercel
@@ -52,9 +62,8 @@ Open [http://localhost:3000](http://localhost:3000).
 
 ## Next implementation steps
 
-- Wire dashboard metrics to Firestore + Stripe sources
-- Port Users & Access admin workflows from `hivewebsite`
-- Add mutating APIs with mandatory audit logging
+- Add Stripe-backed 30-day revenue metrics for dashboard
+- Add role mutation flows for main platform `users` documents
 - Integrate script wrappers for campaign and Bee Ready operations
 - Add tests for sign-in allowlist and protected API access
 

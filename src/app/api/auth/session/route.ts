@@ -3,12 +3,35 @@ import { NextResponse } from "next/server";
 import { createAdminSessionFromIdToken } from "@/lib/auth/session";
 import { logAdminAction } from "@/lib/audit/logger";
 import { SESSION_COOKIE_NAME } from "@/lib/auth/session";
+import { assertRateLimit } from "@/lib/security/rateLimit";
+import { assertValidCsrf } from "@/lib/security/csrf";
 
 type SessionBody = {
   idToken?: string;
 };
 
 export async function POST(request: Request) {
+  try {
+    assertRateLimit(request, "auth-session", { limit: 25, windowMs: 60_000 });
+    await assertValidCsrf(request);
+  } catch (error) {
+    if (error instanceof Error && error.message === "RATE_LIMITED") {
+      return NextResponse.json(
+        { error: "Too many sign-in attempts. Please wait and retry." },
+        { status: 429 },
+      );
+    }
+    if (
+      error instanceof Error &&
+      (error.message === "CSRF_MISSING" || error.message === "CSRF_INVALID")
+    ) {
+      return NextResponse.json(
+        { error: "Missing or invalid CSRF token." },
+        { status: 403 },
+      );
+    }
+  }
+
   const body = (await request.json()) as SessionBody;
 
   if (!body.idToken) {

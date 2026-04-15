@@ -1,8 +1,16 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #0e0e1a;
+  --foreground: #f8f8ff;
+  --hive-surface: #121220;
+  --hive-surface-soft: #151526;
+  --hive-border: #1e1e34;
+  --hive-accent: #ffa500;
+  --hive-accent-strong: #ffb52e;
+  --hive-text-dim: #b8b8cc;
+  --hive-gradient:
+    linear-gradient(155deg, #1a0a3e 0%, #7b2ff2 45%, #c850c0 80%, #ff6b6b 100%);
 }
 
 @theme inline {
@@ -12,15 +20,72 @@
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+body {
+  background:
+    radial-gradient(1200px 700px at 10% -20%, rgba(123, 47, 242, 0.25), transparent 55%),
+    radial-gradient(1000px 600px at 100% -30%, rgba(255, 107, 107, 0.18), transparent 60%),
+    var(--background);
+  color: var(--foreground);
+  font-family:
+    "DM Sans",
+    Arial,
+    Helvetica,
+    sans-serif;
 }
 
-body {
-  background: var(--background);
+.hive-panel {
+  border: 1px solid var(--hive-border);
+  background: var(--hive-surface);
+  border-radius: 14px;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.22);
+}
+
+.hive-card {
+  border: 1px solid var(--hive-border);
+  background: linear-gradient(180deg, var(--hive-surface) 0%, var(--hive-surface-soft) 100%);
+  border-radius: 14px;
+}
+
+.hive-section-label {
+  color: var(--hive-accent);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.hive-subtle {
+  color: var(--hive-text-dim);
+}
+
+.hive-primary-btn {
+  background: var(--hive-accent);
+  color: #121220;
+  border: 1px solid #d7921a;
+  border-radius: 10px;
+  font-weight: 700;
+  transition: transform 0.15s ease, background 0.2s ease;
+}
+
+.hive-primary-btn:hover {
+  background: var(--hive-accent-strong);
+  transform: translateY(-1px);
+}
+
+.hive-secondary-btn {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--hive-border);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  border-radius: 10px;
+}
+
+.hive-input {
+  border: 1px solid #2a2a46;
+  background: #151526;
+  color: var(--foreground);
+  border-radius: 10px;
+}
+
+.hive-input::placeholder {
+  color: #8d8daa;
 }

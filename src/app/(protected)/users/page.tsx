@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import { getCsrfToken } from "@/lib/client/csrf";
 
 type AdminRole =
   | "super_admin"
@@ -18,6 +19,15 @@ type AdminUser = {
   role: AdminRole;
   status: AdminStatus;
   lastLoginAt?: string | null;
+};
+
+type PlatformUser = {
+  uid: string;
+  email: string | null;
+  displayName: string | null;
+  role: string | null;
+  status: string | null;
+  tier: string | null;
 };
 
 const roleOptions: AdminRole[] = [
@@ -47,6 +57,10 @@ export default function UsersPage() {
   });
   const [isSaving, setIsSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState<string | null>(null);
+  const [platformQuery, setPlatformQuery] = useState("");
+  const [platformUsers, setPlatformUsers] = useState<PlatformUser[]>([]);
+  const [isPlatformLoading, setIsPlatformLoading] = useState(false);
+  const [platformError, setPlatformError] = useState<string | null>(null);
 
   const searchParams = useMemo(() => {
     const params = new URLSearchParams();
@@ -86,6 +100,40 @@ export default function UsersPage() {
     void loadUsers();
   }, [loadUsers]);
 
+  const loadPlatformUsers = useCallback(async () => {
+    setIsPlatformLoading(true);
+    setPlatformError(null);
+
+    try {
+      const params = new URLSearchParams();
+      if (platformQuery.trim()) {
+        params.set("q", platformQuery.trim());
+      }
+
+      const response = await fetch(`/api/users/platform-search?${params}`);
+      const payload = (await response.json()) as {
+        users?: PlatformUser[];
+        error?: string;
+      };
+
+      if (!response.ok) {
+        throw new Error(payload.error ?? "Failed to load platform users");
+      }
+
+      setPlatformUsers(payload.users ?? []);
+    } catch (error) {
+      setPlatformError(
+        error instanceof Error ? error.message : "Failed to load platform users",
+      );
+    } finally {
+      setIsPlatformLoading(false);
+    }
+  }, [platformQuery]);
+
+  useEffect(() => {
+    void loadPlatformUsers();
+  }, [loadPlatformUsers]);
+
   const handleGrantAccess = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setSaveMessage(null);
@@ -94,7 +142,10 @@ export default function UsersPage() {
     try {
       const response = await fetch("/api/users/grant-access", {
         method: "POST",
-        headers: { "content-type": "application/json" },
+        headers: {
+          "content-type": "application/json",
+          "x-csrf-token": await getCsrfToken(),
+        },
         body: JSON.stringify(formState),
       });
       const payload = (await response.json()) as { error?: string };
@@ -119,17 +170,101 @@ export default function UsersPage() {
     }
   };
 
+  const fillFromPlatformUser = (user: PlatformUser) => {
+    setFormState((prev) => ({
+      ...prev,
+      uid: user.uid,
+      email: user.email ?? "",
+      displayName: user.displayName ?? "",
+      role: prev.role,
+      status: "active",
+    }));
+    setSaveMessage("Prefilled form from main users collection.");
+  };
+
   return (
     <section className="space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold text-zinc-900">Users & Access</h1>
-        <p className="mt-1 text-sm text-zinc-600">
+        <h1 className="text-2xl font-semibold text-white">Users & Access</h1>
+        <p className="mt-1 text-sm hive-subtle">
           Manage `adminUsers` access, roles, and status for the control center.
         </p>
       </div>
 
-      <article className="rounded-xl border border-zinc-200 bg-white p-4">
-        <h2 className="text-base font-medium text-zinc-900">
+      <article className="hive-card p-4">
+        <h2 className="text-base font-medium text-white">
+          Main platform users (`users` collection)
+        </h2>
+        <p className="mt-1 text-sm hive-subtle">
+          Pull from `hivewebsite` user data and prefill admin access updates.
+        </p>
+        <div className="mt-3 flex flex-wrap items-center gap-3">
+          <input
+            value={platformQuery}
+            onChange={(event) => setPlatformQuery(event.target.value)}
+            placeholder="Search platform users by email, uid, display name"
+            className="hive-input min-w-72 px-3 py-2 text-sm"
+          />
+          <button
+            type="button"
+            onClick={() => void loadPlatformUsers()}
+            className="hive-secondary-btn px-4 py-2 text-sm font-medium"
+          >
+            Refresh
+          </button>
+        </div>
+        {platformError ? (
+          <p className="mt-3 text-sm text-red-700">{platformError}</p>
+        ) : null}
+        {isPlatformLoading ? (
+          <p className="mt-3 text-sm hive-subtle">Loading platform users...</p>
+        ) : (
+          <div className="mt-3 overflow-x-auto">
+            <table className="w-full text-left text-sm">
+              <thead className="text-[#bbbcd1]">
+                <tr>
+                  <th className="pb-2">Email</th>
+                  <th className="pb-2">UID</th>
+                  <th className="pb-2">App Role</th>
+                  <th className="pb-2">App Status</th>
+                  <th className="pb-2">Tier</th>
+                  <th className="pb-2">Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                {platformUsers.map((user) => (
+                  <tr key={user.uid} className="border-t border-[#2a2a46]">
+                    <td className="py-2 text-[#ececff]">
+                      <div>{user.email ?? "—"}</div>
+                      <div className="text-xs text-[#a4a4be]">
+                        {user.displayName ?? "—"}
+                      </div>
+                    </td>
+                    <td className="py-2 font-mono text-xs text-[#a4a4be]">
+                      {user.uid}
+                    </td>
+                    <td className="py-2 text-[#ececff]">{user.role ?? "—"}</td>
+                    <td className="py-2 text-[#ececff]">{user.status ?? "—"}</td>
+                    <td className="py-2 text-[#ececff]">{user.tier ?? "—"}</td>
+                    <td className="py-2">
+                      <button
+                        type="button"
+                        onClick={() => fillFromPlatformUser(user)}
+                        className="hive-secondary-btn px-3 py-1.5 text-xs font-medium"
+                      >
+                        Use in admin form
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </article>
+
+      <article className="hive-card p-4">
+        <h2 className="text-base font-medium text-white">
           Grant or update admin access
         </h2>
         <form className="mt-3 grid gap-3 md:grid-cols-2" onSubmit={handleGrantAccess}>
@@ -139,7 +274,7 @@ export default function UsersPage() {
               setFormState((prev) => ({ ...prev, uid: event.target.value }))
             }
             placeholder="Firebase UID"
-            className="rounded-md border border-zinc-300 px-3 py-2 text-sm"
+            className="hive-input px-3 py-2 text-sm"
             required
           />
           <input
@@ -148,7 +283,7 @@ export default function UsersPage() {
               setFormState((prev) => ({ ...prev, email: event.target.value }))
             }
             placeholder="Email"
-            className="rounded-md border border-zinc-300 px-3 py-2 text-sm"
+            className="hive-input px-3 py-2 text-sm"
             type="email"
             required
           />
@@ -161,7 +296,7 @@ export default function UsersPage() {
               }))
             }
             placeholder="Display name (optional)"
-            className="rounded-md border border-zinc-300 px-3 py-2 text-sm"
+            className="hive-input px-3 py-2 text-sm"
           />
           <select
             value={formState.role}
@@ -171,7 +306,7 @@ export default function UsersPage() {
                 role: event.target.value as AdminRole,
               }))
             }
-            className="rounded-md border border-zinc-300 px-3 py-2 text-sm"
+            className="hive-input px-3 py-2 text-sm"
           >
             {roleOptions.map((role) => (
               <option key={role} value={role}>
@@ -187,7 +322,7 @@ export default function UsersPage() {
                 status: event.target.value as AdminStatus,
               }))
             }
-            className="rounded-md border border-zinc-300 px-3 py-2 text-sm"
+            className="hive-input px-3 py-2 text-sm"
           >
             <option value="active">active</option>
             <option value="suspended">suspended</option>
@@ -198,38 +333,38 @@ export default function UsersPage() {
               setFormState((prev) => ({ ...prev, reason: event.target.value }))
             }
             placeholder="Reason for change (audit log)"
-            className="rounded-md border border-zinc-300 px-3 py-2 text-sm"
+            className="hive-input px-3 py-2 text-sm"
             required
           />
           <div className="md:col-span-2">
             <button
               type="submit"
               disabled={isSaving}
-              className="rounded-md bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-700 disabled:opacity-50"
+              className="hive-primary-btn px-4 py-2 text-sm disabled:opacity-50"
             >
               {isSaving ? "Saving..." : "Save access"}
             </button>
           </div>
         </form>
         {saveMessage ? (
-          <p className="mt-3 text-sm text-zinc-700">{saveMessage}</p>
+          <p className="mt-3 text-sm text-[#dcdcef]">{saveMessage}</p>
         ) : null}
       </article>
 
-      <article className="rounded-xl border border-zinc-200 bg-white p-4">
+      <article className="hive-card p-4">
         <div className="flex flex-wrap items-center gap-3">
           <input
             value={query}
             onChange={(event) => setQuery(event.target.value)}
             placeholder="Search by uid, email, display name"
-            className="min-w-72 rounded-md border border-zinc-300 px-3 py-2 text-sm"
+            className="hive-input min-w-72 px-3 py-2 text-sm"
           />
           <select
             value={roleFilter}
             onChange={(event) =>
               setRoleFilter(event.target.value as AdminRole | "all")
             }
-            className="rounded-md border border-zinc-300 px-3 py-2 text-sm"
+            className="hive-input px-3 py-2 text-sm"
           >
             <option value="all">All roles</option>
             {roleOptions.map((role) => (
@@ -243,7 +378,7 @@ export default function UsersPage() {
             onChange={(event) =>
               setStatusFilter(event.target.value as AdminStatus | "all")
             }
-            className="rounded-md border border-zinc-300 px-3 py-2 text-sm"
+            className="hive-input px-3 py-2 text-sm"
           >
             <option value="all">All statuses</option>
             <option value="active">active</option>
@@ -253,11 +388,11 @@ export default function UsersPage() {
 
         {error ? <p className="mt-3 text-sm text-red-700">{error}</p> : null}
         {isLoading ? (
-          <p className="mt-3 text-sm text-zinc-500">Loading users...</p>
+          <p className="mt-3 text-sm hive-subtle">Loading users...</p>
         ) : (
           <div className="mt-3 overflow-x-auto">
             <table className="w-full text-left text-sm">
-              <thead className="text-zinc-500">
+              <thead className="text-[#bbbcd1]">
                 <tr>
                   <th className="pb-2">Email</th>
                   <th className="pb-2">UID</th>
@@ -268,19 +403,19 @@ export default function UsersPage() {
               </thead>
               <tbody>
                 {users.map((user) => (
-                  <tr key={user.uid} className="border-t border-zinc-100">
-                    <td className="py-2 text-zinc-900">
+                  <tr key={user.uid} className="border-t border-[#2a2a46]">
+                    <td className="py-2 text-[#ececff]">
                       <div>{user.email}</div>
-                      <div className="text-xs text-zinc-500">
+                      <div className="text-xs text-[#a4a4be]">
                         {user.displayName ?? "—"}
                       </div>
                     </td>
-                    <td className="py-2 font-mono text-xs text-zinc-600">
+                    <td className="py-2 font-mono text-xs text-[#a4a4be]">
                       {user.uid}
                     </td>
-                    <td className="py-2">{user.role}</td>
-                    <td className="py-2">{user.status}</td>
-                    <td className="py-2 text-zinc-600">
+                    <td className="py-2 text-[#ececff]">{user.role}</td>
+                    <td className="py-2 text-[#ececff]">{user.status}</td>
+                    <td className="py-2 text-[#a4a4be]">
                       {user.lastLoginAt ?? "—"}
                     </td>
                   </tr>
