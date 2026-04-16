@@ -18,7 +18,9 @@ export type AdminPermission =
   | "billing.read"
   | "billing.adjust"
   | "security.read"
-  | "security.write";
+  | "security.write"
+  | "content.read"
+  | "content.write";
 
 export type AdminSession = {
   uid: string;

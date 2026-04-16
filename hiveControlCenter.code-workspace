@@ -1,0 +1,14 @@
+{
+	"folders": [
+		{
+			"path": "."
+		},
+		{
+			"path": "../../hivewebsite"
+		},
+		{
+			"path": "../../hiveTools"
+		}
+	],
+	"settings": {}
+}

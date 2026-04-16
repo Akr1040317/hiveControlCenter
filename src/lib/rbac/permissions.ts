@@ -14,6 +14,8 @@ const ROLE_PERMISSIONS: Record<AdminRole, AdminPermission[]> = {
     "billing.adjust",
     "security.read",
     "security.write",
+    "content.read",
+    "content.write",
   ],
   ops_admin: [
     "users.read",
@@ -23,11 +25,13 @@ const ROLE_PERMISSIONS: Record<AdminRole, AdminPermission[]> = {
     "automation.approve",
     "automation.cancel",
     "security.read",
+    "content.read",
+    "content.write",
   ],
-  marketing_admin: ["campaigns.preview", "campaigns.send", "users.read"],
-  support_admin: ["users.read", "users.write", "security.read"],
+  marketing_admin: ["campaigns.preview", "campaigns.send", "users.read", "content.read"],
+  support_admin: ["users.read", "users.write", "security.read", "content.read"],
   finance_admin: ["billing.read", "billing.adjust", "security.read"],
-  viewer: ["users.read", "campaigns.preview", "billing.read", "security.read"],
+  viewer: ["users.read", "campaigns.preview", "billing.read", "security.read", "content.read"],
 };
 
 export function getPermissionsForRole(role: AdminRole): AdminPermission[] {
