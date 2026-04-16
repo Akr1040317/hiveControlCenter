@@ -179,6 +179,7 @@ export type AutomationAlert = {
   runbookId: string;
   message: string;
   createdAtLabel: string;
+  muted?: boolean;
 };
 
 export async function getAutomationOpsOverview(): Promise<AutomationOpsOverview> {
@@ -277,6 +278,8 @@ export async function getAutomationAlerts(limit = 20): Promise<AutomationAlert[]
     ]);
 
   const alerts: AutomationAlert[] = [];
+  const mutedSnapshot = await adminDb.collection("automationAlertAcks").get();
+  const mutedAlertIds = new Set(mutedSnapshot.docs.map((doc) => doc.id));
 
   for (const doc of failedSnapshot.docs) {
     const data = doc.data();
@@ -288,6 +291,7 @@ export async function getAutomationAlerts(limit = 20): Promise<AutomationAlert[]
       runbookId: String(data.runbookId ?? "unknown"),
       message: String(data.outputSummary ?? "Job failed without summary."),
       createdAtLabel: getIsoLabel(data.updatedAt ?? data.createdAt),
+      muted: mutedAlertIds.has(`failed:${doc.id}`),
     });
   }
 
@@ -301,6 +305,7 @@ export async function getAutomationAlerts(limit = 20): Promise<AutomationAlert[]
       runbookId: String(data.runbookId ?? "unknown"),
       message: "Job has been running for over 30 minutes.",
       createdAtLabel: getIsoLabel(data.startedAt ?? data.createdAt),
+      muted: mutedAlertIds.has(`running:${doc.id}`),
     });
   }
 
@@ -314,10 +319,30 @@ export async function getAutomationAlerts(limit = 20): Promise<AutomationAlert[]
       runbookId: String(data.runbookId ?? "unknown"),
       message: "Pending approval for over 6 hours.",
       createdAtLabel: getIsoLabel(data.createdAt),
+      muted: mutedAlertIds.has(`approval:${doc.id}`),
     });
   }
 
-  return alerts.slice(0, limit);
+  return alerts.filter((alert) => !alert.muted).slice(0, limit);
+}
+
+export async function acknowledgeAutomationAlert(input: {
+  alertId: string;
+  actor: AdminSession;
+  reason: string;
+}) {
+  const adminDb = getAdminDb();
+  await adminDb.collection("automationAlertAcks").doc(input.alertId).set(
+    {
+      alertId: input.alertId,
+      reason: input.reason,
+      acknowledgedBy: input.actor.uid,
+      acknowledgedByEmail: input.actor.email,
+      acknowledgedAt: FieldValue.serverTimestamp(),
+      updatedAt: FieldValue.serverTimestamp(),
+    },
+    { merge: true },
+  );
 }
 
 export async function listRecentJobs(limit = 20): Promise<AutomationJobRecord[]> {
