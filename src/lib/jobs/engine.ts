@@ -171,6 +171,16 @@ export type AutomationOpsOverview = {
   queuedJobs: number;
 };
 
+export type AutomationAlert = {
+  id: string;
+  severity: "high" | "medium";
+  type: "job_failed" | "job_running_stale" | "job_pending_approval_stale";
+  jobId: string;
+  runbookId: string;
+  message: string;
+  createdAtLabel: string;
+};
+
 export async function getAutomationOpsOverview(): Promise<AutomationOpsOverview> {
   const adminDb = getAdminDb();
   const now = Date.now();
@@ -215,6 +225,99 @@ export async function getAutomationOpsOverview(): Promise<AutomationOpsOverview>
     failedJobs24h,
     queuedJobs,
   };
+}
+
+function getIsoLabel(value: unknown) {
+  if (
+    typeof value === "object" &&
+    value !== null &&
+    "toDate" in value &&
+    typeof (value as { toDate?: () => Date }).toDate === "function"
+  ) {
+    try {
+      return (value as { toDate: () => Date }).toDate().toISOString();
+    } catch {
+      return "unknown";
+    }
+  }
+  if (typeof value === "string") {
+    return value;
+  }
+  return "unknown";
+}
+
+export async function getAutomationAlerts(limit = 20): Promise<AutomationAlert[]> {
+  const adminDb = getAdminDb();
+  const now = Date.now();
+  const staleRunningCutoff = Timestamp.fromDate(new Date(now - 30 * 60 * 1000));
+  const staleApprovalCutoff = Timestamp.fromDate(new Date(now - 6 * 60 * 60 * 1000));
+
+  const [failedSnapshot, staleRunningSnapshot, staleApprovalSnapshot] =
+    await Promise.all([
+      adminDb
+        .collection("automationJobRuns")
+        .where("status", "==", "failed")
+        .orderBy("updatedAt", "desc")
+        .limit(limit)
+        .get(),
+      adminDb
+        .collection("automationJobRuns")
+        .where("status", "==", "running")
+        .where("startedAt", "<=", staleRunningCutoff)
+        .orderBy("startedAt", "asc")
+        .limit(limit)
+        .get(),
+      adminDb
+        .collection("automationJobRuns")
+        .where("status", "==", "pending_approval")
+        .where("createdAt", "<=", staleApprovalCutoff)
+        .orderBy("createdAt", "asc")
+        .limit(limit)
+        .get(),
+    ]);
+
+  const alerts: AutomationAlert[] = [];
+
+  for (const doc of failedSnapshot.docs) {
+    const data = doc.data();
+    alerts.push({
+      id: `failed:${doc.id}`,
+      severity: "high",
+      type: "job_failed",
+      jobId: doc.id,
+      runbookId: String(data.runbookId ?? "unknown"),
+      message: String(data.outputSummary ?? "Job failed without summary."),
+      createdAtLabel: getIsoLabel(data.updatedAt ?? data.createdAt),
+    });
+  }
+
+  for (const doc of staleRunningSnapshot.docs) {
+    const data = doc.data();
+    alerts.push({
+      id: `running:${doc.id}`,
+      severity: "high",
+      type: "job_running_stale",
+      jobId: doc.id,
+      runbookId: String(data.runbookId ?? "unknown"),
+      message: "Job has been running for over 30 minutes.",
+      createdAtLabel: getIsoLabel(data.startedAt ?? data.createdAt),
+    });
+  }
+
+  for (const doc of staleApprovalSnapshot.docs) {
+    const data = doc.data();
+    alerts.push({
+      id: `approval:${doc.id}`,
+      severity: "medium",
+      type: "job_pending_approval_stale",
+      jobId: doc.id,
+      runbookId: String(data.runbookId ?? "unknown"),
+      message: "Pending approval for over 6 hours.",
+      createdAtLabel: getIsoLabel(data.createdAt),
+    });
+  }
+
+  return alerts.slice(0, limit);
 }
 
 export async function listRecentJobs(limit = 20): Promise<AutomationJobRecord[]> {

@@ -1,10 +1,16 @@
-import { getAutomationOpsOverview, listRunbooks } from "@/lib/jobs/engine";
+import {
+  getAutomationAlerts,
+  getAutomationOpsOverview,
+  listRunbooks,
+} from "@/lib/jobs/engine";
+import { AutomationAlertsPanel } from "@/components/automation/AutomationAlertsPanel";
 import { AutomationJobsPanel } from "@/components/automation/AutomationJobsPanel";
 import { PronunciationRunPanel } from "@/components/automation/PronunciationRunPanel";
 
 export default async function AutomationPage() {
   const runbooks = await listRunbooks();
   const overview = await getAutomationOpsOverview();
+  const alerts = await getAutomationAlerts(20);
   const grouped = runbooks.reduce<Record<string, typeof runbooks>>(
     (acc, runbook) => {
       if (!acc[runbook.category]) {
@@ -92,6 +98,7 @@ export default async function AutomationPage() {
       ))}
 
       <PronunciationRunPanel />
+      <AutomationAlertsPanel alerts={alerts} />
       <AutomationJobsPanel />
     </section>
   );
