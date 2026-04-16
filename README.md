@@ -27,7 +27,8 @@ cp .env.example .env.local
    - `FIREBASE_ADMIN_CLIENT_EMAIL`
    - `FIREBASE_ADMIN_PRIVATE_KEY`
    - `FIREBASE_ADMIN_STORAGE_BUCKET`
-   - `STRIPE_SECRET_KEY` (required for Stripe revenue/health on dashboard)
+  - `STRIPE_SECRET_KEY` (required for Stripe revenue/health on dashboard)
+  - `STRIPE_WEBHOOK_SECRET` (for webhook verification + webhook health readiness)
    - `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `SMTP_PASS`, `FROM_EMAIL`
    - `ADMIN_CENTER_AUTOMATION_ENABLED=true` (set `false` to pause live executions)
    - Keep `FIREBASE_ADMIN_PROJECT_ID=beeapp-5c98b` to match `hivewebsite`.
@@ -61,6 +62,11 @@ Open [http://localhost:3000](http://localhost:3000).
 - `/api/campaigns/templates` - campaign template catalog
 - `/api/campaigns/templates/[templateKey]/preview` - template preview payload
 - `/api/integrations/stripe/health` - Stripe connectivity status for billing admins
+- `/api/commerce/stripe/customer-lookup` - search Stripe customers by email/id/name
+- `/api/commerce/stripe/sync-check` - compare app billing fields vs Stripe truth
+- `/api/commerce/stripe/payment-failures` - list recent failed payment intents
+- `/api/commerce/stripe/webhook-health` - webhook telemetry summary from Firestore
+- `/api/commerce/stripe/resync` - one-click user billing resync from Stripe (audited)
 - `/api/content/modules` - content management module definitions
 - `/api/tools/scripts` - script inventory from hivewebsite + hiveTools mapping
 - `/api/automation/jobs` - dry-run-first runbook execution scaffold
