@@ -2,11 +2,30 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { requireAdminSession } from "@/lib/auth/guards";
-import { getJobById } from "@/lib/jobs/engine";
+import { getJobById, getJobEvents } from "@/lib/jobs/engine";
 
 type PageProps = {
   params: Promise<{ jobId: string }>;
 };
+
+function formatTimestamp(value: unknown) {
+  if (
+    typeof value === "object" &&
+    value !== null &&
+    "toDate" in value &&
+    typeof (value as { toDate?: () => Date }).toDate === "function"
+  ) {
+    try {
+      return (value as { toDate: () => Date }).toDate().toLocaleString();
+    } catch {
+      return "—";
+    }
+  }
+  if (typeof value === "string") {
+    return value;
+  }
+  return "—";
+}
 
 export default async function AutomationJobDetailPage({ params }: PageProps) {
   await requireAdminSession();
@@ -15,6 +34,7 @@ export default async function AutomationJobDetailPage({ params }: PageProps) {
   if (!job) {
     notFound();
   }
+  const events = await getJobEvents(jobId, 100);
 
   return (
     <section className="space-y-5">
@@ -76,6 +96,40 @@ export default async function AutomationJobDetailPage({ params }: PageProps) {
             2,
           )}
         </pre>
+      </article>
+
+      <article className="hive-card p-4">
+        <h2 className="text-base font-medium text-white">Timeline</h2>
+        {events.length === 0 ? (
+          <p className="mt-2 text-sm hive-subtle">No timeline events yet.</p>
+        ) : (
+          <div className="mt-3 overflow-x-auto">
+            <table className="w-full text-left text-sm">
+              <thead className="text-[#bbbcd1]">
+                <tr>
+                  <th className="pb-2">Time</th>
+                  <th className="pb-2">Type</th>
+                  <th className="pb-2">Message</th>
+                  <th className="pb-2">Actor</th>
+                </tr>
+              </thead>
+              <tbody>
+                {events.map((event) => (
+                  <tr key={event.id} className="border-t border-[#2a2a46]">
+                    <td className="py-2 text-[#a4a4be]">
+                      {formatTimestamp(event.createdAt)}
+                    </td>
+                    <td className="py-2 text-[#ececff]">{String(event.type ?? "—")}</td>
+                    <td className="py-2 text-[#dcdcef]">{String(event.message ?? "—")}</td>
+                    <td className="py-2 text-[#a4a4be]">
+                      {String(event.actorEmail ?? "system")}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </article>
     </section>
   );

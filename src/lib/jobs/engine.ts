@@ -31,11 +31,47 @@ export type AutomationJobRecord = {
   [key: string]: unknown;
 };
 
+export type AutomationJobEventRecord = {
+  id: string;
+  type: string;
+  message: string;
+  actorUid?: string | null;
+  actorEmail?: string | null;
+  metadata?: Record<string, unknown>;
+  createdAt?: unknown;
+  [key: string]: unknown;
+};
+
+async function addJobEvent(input: {
+  jobId: string;
+  type: string;
+  message: string;
+  actorUid?: string | null;
+  actorEmail?: string | null;
+  metadata?: Record<string, unknown>;
+}) {
+  const adminDb = getAdminDb();
+  await adminDb
+    .collection("automationJobRuns")
+    .doc(input.jobId)
+    .collection("events")
+    .add({
+      type: input.type,
+      message: input.message,
+      actorUid: input.actorUid ?? null,
+      actorEmail: input.actorEmail ?? null,
+      metadata: input.metadata ?? {},
+      createdAt: FieldValue.serverTimestamp(),
+    });
+}
+
 async function executeJobNow(input: {
   jobId: string;
   runbookId: string;
   payload: Record<string, unknown>;
   isDryRun: boolean;
+  actorUid?: string;
+  actorEmail?: string;
 }) {
   const adminDb = getAdminDb();
   const ref = adminDb.collection("automationJobRuns").doc(input.jobId);
@@ -48,6 +84,14 @@ async function executeJobNow(input: {
     },
     { merge: true },
   );
+  await addJobEvent({
+    jobId: input.jobId,
+    type: "execution.started",
+    message: `Execution started (${input.isDryRun ? "dry run" : "live"}).`,
+    actorUid: input.actorUid,
+    actorEmail: input.actorEmail,
+    metadata: { runbookId: input.runbookId, isDryRun: input.isDryRun },
+  });
 
   try {
     const { executeRunbook } = await import("@/lib/jobs/executors");
@@ -71,6 +115,18 @@ async function executeJobNow(input: {
       },
       { merge: true },
     );
+    await addJobEvent({
+      jobId: input.jobId,
+      type: result.status === "completed" ? "execution.completed" : "execution.failed",
+      message: result.outputSummary,
+      actorUid: input.actorUid,
+      actorEmail: input.actorEmail,
+      metadata: {
+        command: result.command,
+        exitCode: result.exitCode,
+        durationMs: result.durationMs,
+      },
+    });
   } catch (error) {
     await ref.set(
       {
@@ -89,6 +145,16 @@ async function executeJobNow(input: {
       },
       { merge: true },
     );
+    await addJobEvent({
+      jobId: input.jobId,
+      type: "execution.failed",
+      message: "Runbook execution crashed before completion.",
+      actorUid: input.actorUid,
+      actorEmail: input.actorEmail,
+      metadata: {
+        error: error instanceof Error ? error.message : "Unknown execution error",
+      },
+    });
   }
 }
 
@@ -118,6 +184,24 @@ export async function getJobById(
     return null;
   }
   return { id: doc.id, ...doc.data() } as AutomationJobRecord;
+}
+
+export async function getJobEvents(
+  jobId: string,
+  limit = 100,
+): Promise<AutomationJobEventRecord[]> {
+  const adminDb = getAdminDb();
+  const snapshot = await adminDb
+    .collection("automationJobRuns")
+    .doc(jobId)
+    .collection("events")
+    .orderBy("createdAt", "desc")
+    .limit(limit)
+    .get();
+
+  return snapshot.docs.map(
+    (doc) => ({ id: doc.id, ...doc.data() }) as AutomationJobEventRecord,
+  );
 }
 
 export async function updateJobStatus(input: {
@@ -171,6 +255,17 @@ export async function updateJobStatus(input: {
   }
 
   await ref.set(patch, { merge: true });
+  await addJobEvent({
+    jobId: input.jobId,
+    type: input.status === "approved" ? "approval.approved" : "approval.cancelled",
+    message:
+      input.status === "approved"
+        ? `Approved: ${input.reason}`
+        : `Cancelled: ${input.reason}`,
+    actorUid: input.actorUid,
+    actorEmail: input.actorEmail,
+    metadata: { reason: input.reason },
+  });
 
   if (input.status === "approved") {
     const runbookId = String(current.runbookId ?? "");
@@ -181,6 +276,8 @@ export async function updateJobStatus(input: {
         runbookId,
         payload,
         isDryRun: false,
+        actorUid: input.actorUid,
+        actorEmail: input.actorEmail,
       });
     } else {
       await ref.set(
@@ -192,6 +289,13 @@ export async function updateJobStatus(input: {
         },
         { merge: true },
       );
+      await addJobEvent({
+        jobId: input.jobId,
+        type: "execution.queued",
+        message: "Approved but no executor registered. Job remains queued.",
+        actorUid: input.actorUid,
+        actorEmail: input.actorEmail,
+      });
     }
   }
 
@@ -250,6 +354,14 @@ export async function createDryRunJob(input: {
   };
 
   const jobRef = await adminDb.collection("automationJobRuns").add(record);
+  await addJobEvent({
+    jobId: jobRef.id,
+    type: "job.created",
+    message: `Job created with status ${nextStatus}.`,
+    actorUid: input.actor.uid,
+    actorEmail: input.actor.email,
+    metadata: { runbookId: runbook.id, isDryRun },
+  });
 
   if (canExecuteNow && nextStatus !== "pending_approval") {
     await executeJobNow({
@@ -257,6 +369,8 @@ export async function createDryRunJob(input: {
       runbookId: runbook.id,
       payload: parsed.data as Record<string, unknown>,
       isDryRun,
+      actorUid: input.actor.uid,
+      actorEmail: input.actor.email,
     });
   }
 
@@ -266,4 +380,57 @@ export async function createDryRunJob(input: {
     id: finalizedDoc.id,
     ...(finalizedDoc.data() as Record<string, unknown>),
   };
+}
+
+export async function retryJob(input: {
+  actor: AdminSession;
+  jobId: string;
+  reason: string;
+}) {
+  const original = await getJobById(input.jobId);
+  if (!original) {
+    throw new Error("JOB_NOT_FOUND");
+  }
+
+  const status = String(original.status ?? "");
+  if (status !== "failed" && status !== "cancelled") {
+    throw new Error("JOB_NOT_RETRYABLE");
+  }
+
+  const runbookId = String(original.runbookId ?? "");
+  if (!runbookId) {
+    throw new Error("JOB_RUNBOOK_MISSING");
+  }
+
+  const newJob = await createDryRunJob({
+    actor: input.actor,
+    runbookId,
+    payload: (original.input ?? {}) as Record<string, unknown>,
+    isDryRun: Boolean(original.isDryRun),
+  });
+
+  const adminDb = getAdminDb();
+  const originalRef = adminDb.collection("automationJobRuns").doc(input.jobId);
+  await originalRef.set(
+    {
+      retriedAt: FieldValue.serverTimestamp(),
+      retriedBy: input.actor.uid,
+      retriedByEmail: input.actor.email,
+      retryReason: input.reason,
+      retryJobId: newJob.id,
+      updatedAt: FieldValue.serverTimestamp(),
+    },
+    { merge: true },
+  );
+
+  await addJobEvent({
+    jobId: input.jobId,
+    type: "job.retried",
+    message: `Job retried as ${newJob.id}. Reason: ${input.reason}`,
+    actorUid: input.actor.uid,
+    actorEmail: input.actor.email,
+    metadata: { retryJobId: newJob.id },
+  });
+
+  return newJob;
 }

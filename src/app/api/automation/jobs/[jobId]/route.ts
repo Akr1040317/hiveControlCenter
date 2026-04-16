@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { assertPermission, getAdminSession } from "@/lib/auth/guards";
-import { getJobById } from "@/lib/jobs/engine";
+import { getJobById, getJobEvents } from "@/lib/jobs/engine";
 
 type RouteParams = {
   params: Promise<{ jobId: string }>;
@@ -24,6 +24,7 @@ export async function GET(_: Request, context: RouteParams) {
   if (!job) {
     return NextResponse.json({ error: "Job not found" }, { status: 404 });
   }
+  const events = await getJobEvents(jobId, 100);
 
-  return NextResponse.json({ job });
+  return NextResponse.json({ job, events });
 }

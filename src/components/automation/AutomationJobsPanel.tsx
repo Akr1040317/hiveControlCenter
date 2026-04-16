@@ -39,7 +39,10 @@ export function AutomationJobsPanel() {
     void loadJobs();
   }, [loadJobs]);
 
-  const runAction = async (jobId: string, action: "approve" | "cancel") => {
+  const runAction = async (
+    jobId: string,
+    action: "approve" | "cancel" | "retry",
+  ) => {
     const reason = reasonByJobId[jobId]?.trim();
     if (!reason || reason.length < 6) {
       setMessage("Add a reason (at least 6 chars) before approving/canceling.");
@@ -60,7 +63,11 @@ export function AutomationJobsPanel() {
         throw new Error(payload.error ?? `Failed to ${action} job`);
       }
 
-      setMessage(`Job ${action}d successfully.`);
+      setMessage(
+        action === "retry"
+          ? "Job retried successfully."
+          : `Job ${action}d successfully.`,
+      );
       await loadJobs();
     } catch (error) {
       setMessage(error instanceof Error ? error.message : `Failed to ${action} job`);
@@ -147,6 +154,15 @@ export function AutomationJobsPanel() {
                       >
                         Cancel
                       </button>
+                      {job.status === "failed" || job.status === "cancelled" ? (
+                        <button
+                          type="button"
+                          onClick={() => void runAction(job.id, "retry")}
+                          className="hive-primary-btn px-2 py-1 text-xs"
+                        >
+                          Retry
+                        </button>
+                      ) : null}
                     </div>
                   </td>
                 </tr>
