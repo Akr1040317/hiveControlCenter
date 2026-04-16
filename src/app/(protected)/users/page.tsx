@@ -30,6 +30,14 @@ type PlatformUser = {
   tier: string | null;
 };
 
+type PlatformEditState = {
+  uid: string;
+  role: string;
+  status: string;
+  tier: string;
+  reason: string;
+};
+
 const roleOptions: AdminRole[] = [
   "super_admin",
   "ops_admin",
@@ -61,6 +69,19 @@ export default function UsersPage() {
   const [platformUsers, setPlatformUsers] = useState<PlatformUser[]>([]);
   const [isPlatformLoading, setIsPlatformLoading] = useState(false);
   const [platformError, setPlatformError] = useState<string | null>(null);
+  const [platformEdit, setPlatformEdit] = useState<PlatformEditState>({
+    uid: "",
+    role: "student",
+    status: "active",
+    tier: "tier0",
+    reason: "",
+  });
+  const [isPlatformSaving, setIsPlatformSaving] = useState(false);
+  const [platformSaveMessage, setPlatformSaveMessage] = useState<string | null>(null);
+  const [bulkRowsText, setBulkRowsText] = useState("");
+  const [bulkReason, setBulkReason] = useState("");
+  const [bulkMessage, setBulkMessage] = useState<string | null>(null);
+  const [isBulkSaving, setIsBulkSaving] = useState(false);
 
   const searchParams = useMemo(() => {
     const params = new URLSearchParams();
@@ -180,6 +201,91 @@ export default function UsersPage() {
       status: "active",
     }));
     setSaveMessage("Prefilled form from main users collection.");
+    setPlatformEdit({
+      uid: user.uid,
+      role: user.role ?? "student",
+      status: user.status ?? "active",
+      tier: user.tier ?? "tier0",
+      reason: "",
+    });
+    setPlatformSaveMessage("Prefilled platform user editor.");
+  };
+
+  const handlePlatformUpdate = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setIsPlatformSaving(true);
+    setPlatformSaveMessage(null);
+
+    try {
+      const response = await fetch("/api/users/platform-update", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-csrf-token": await getCsrfToken(),
+        },
+        body: JSON.stringify(platformEdit),
+      });
+      const payload = (await response.json()) as { error?: string };
+      if (!response.ok) {
+        throw new Error(payload.error ?? "Failed to update platform user");
+      }
+
+      setPlatformSaveMessage("Platform user updated.");
+      setPlatformEdit((prev) => ({ ...prev, reason: "" }));
+      await loadPlatformUsers();
+    } catch (error) {
+      setPlatformSaveMessage(
+        error instanceof Error ? error.message : "Failed to update platform user",
+      );
+    } finally {
+      setIsPlatformSaving(false);
+    }
+  };
+
+  const handleBulkPlatformUpdate = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setBulkMessage(null);
+    setIsBulkSaving(true);
+
+    try {
+      const rows = bulkRowsText
+        .split("\n")
+        .map((line) => line.trim())
+        .filter(Boolean)
+        .map((line) => {
+          const [uid, role, status, tier] = line.split(",").map((part) => part.trim());
+          return { uid, role, status, tier };
+        });
+
+      const response = await fetch("/api/users/platform-bulk-update", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-csrf-token": await getCsrfToken(),
+        },
+        body: JSON.stringify({
+          reason: bulkReason,
+          updates: rows,
+        }),
+      });
+      const payload = (await response.json()) as {
+        error?: string;
+        successCount?: number;
+        failureCount?: number;
+      };
+      if (!response.ok) {
+        throw new Error(payload.error ?? "Bulk update failed");
+      }
+
+      setBulkMessage(
+        `Bulk update complete. Success: ${payload.successCount ?? 0}, failures: ${payload.failureCount ?? 0}.`,
+      );
+      await loadPlatformUsers();
+    } catch (error) {
+      setBulkMessage(error instanceof Error ? error.message : "Bulk update failed");
+    } finally {
+      setIsBulkSaving(false);
+    }
   };
 
   return (
@@ -261,6 +367,109 @@ export default function UsersPage() {
             </table>
           </div>
         )}
+      </article>
+
+      <article className="hive-card p-4">
+        <h2 className="text-base font-medium text-white">
+          Update platform user role/status/tier
+        </h2>
+        <p className="mt-1 text-sm hive-subtle">
+          Applies directly to the main `users` collection with audit metadata.
+        </p>
+        <form className="mt-3 grid gap-3 md:grid-cols-2" onSubmit={handlePlatformUpdate}>
+          <input
+            value={platformEdit.uid}
+            onChange={(event) =>
+              setPlatformEdit((prev) => ({ ...prev, uid: event.target.value }))
+            }
+            placeholder="Platform user UID"
+            className="hive-input px-3 py-2 text-sm"
+            required
+          />
+          <input
+            value={platformEdit.role}
+            onChange={(event) =>
+              setPlatformEdit((prev) => ({ ...prev, role: event.target.value }))
+            }
+            placeholder="Role (student, teacher, etc.)"
+            className="hive-input px-3 py-2 text-sm"
+            required
+          />
+          <input
+            value={platformEdit.status}
+            onChange={(event) =>
+              setPlatformEdit((prev) => ({ ...prev, status: event.target.value }))
+            }
+            placeholder="Status (active, suspended, etc.)"
+            className="hive-input px-3 py-2 text-sm"
+            required
+          />
+          <input
+            value={platformEdit.tier}
+            onChange={(event) =>
+              setPlatformEdit((prev) => ({ ...prev, tier: event.target.value }))
+            }
+            placeholder="Tier (tier0/tier1/tier2)"
+            className="hive-input px-3 py-2 text-sm"
+            required
+          />
+          <input
+            value={platformEdit.reason}
+            onChange={(event) =>
+              setPlatformEdit((prev) => ({ ...prev, reason: event.target.value }))
+            }
+            placeholder="Reason for update (audit log)"
+            className="hive-input px-3 py-2 text-sm md:col-span-2"
+            required
+          />
+          <div className="md:col-span-2">
+            <button
+              type="submit"
+              disabled={isPlatformSaving}
+              className="hive-primary-btn px-4 py-2 text-sm disabled:opacity-50"
+            >
+              {isPlatformSaving ? "Saving..." : "Update platform user"}
+            </button>
+          </div>
+        </form>
+        {platformSaveMessage ? (
+          <p className="mt-3 text-sm text-[#dcdcef]">{platformSaveMessage}</p>
+        ) : null}
+      </article>
+
+      <article className="hive-card p-4">
+        <h2 className="text-base font-medium text-white">
+          Bulk platform user updates
+        </h2>
+        <p className="mt-1 text-sm hive-subtle">
+          Paste rows in format: `uid,role,status,tier` (one per line).
+        </p>
+        <form className="mt-3 space-y-3" onSubmit={handleBulkPlatformUpdate}>
+          <textarea
+            value={bulkRowsText}
+            onChange={(event) => setBulkRowsText(event.target.value)}
+            className="hive-input min-h-32 w-full px-3 py-2 text-sm"
+            placeholder="uid1,teacher,active,tier1&#10;uid2,student,suspended,tier0"
+            required
+          />
+          <input
+            value={bulkReason}
+            onChange={(event) => setBulkReason(event.target.value)}
+            className="hive-input w-full px-3 py-2 text-sm"
+            placeholder="Reason for bulk update"
+            required
+          />
+          <button
+            type="submit"
+            disabled={isBulkSaving}
+            className="hive-primary-btn px-4 py-2 text-sm disabled:opacity-50"
+          >
+            {isBulkSaving ? "Applying..." : "Apply Bulk Update"}
+          </button>
+        </form>
+        {bulkMessage ? (
+          <p className="mt-3 text-sm text-[#dcdcef]">{bulkMessage}</p>
+        ) : null}
       </article>
 
       <article className="hive-card p-4">

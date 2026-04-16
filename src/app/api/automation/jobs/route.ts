@@ -2,8 +2,7 @@ import { NextResponse } from "next/server";
 
 import { assertPermission, getAdminSession } from "@/lib/auth/guards";
 import { logAdminAction } from "@/lib/audit/logger";
-import { createDryRunJob } from "@/lib/jobs/engine";
-import { getAdminDb } from "@/lib/firebase/admin";
+import { createDryRunJob, listRecentJobs } from "@/lib/jobs/engine";
 import { assertRateLimit } from "@/lib/security/rateLimit";
 import { assertValidCsrf } from "@/lib/security/csrf";
 
@@ -19,14 +18,7 @@ export async function GET() {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const adminDb = getAdminDb();
-  const snapshot = await adminDb
-    .collection("automationJobRuns")
-    .orderBy("createdAt", "desc")
-    .limit(20)
-    .get();
-
-  const jobs = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+  const jobs = await listRecentJobs(20);
   return NextResponse.json({ jobs });
 }
 

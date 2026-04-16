@@ -42,6 +42,39 @@ export const RUNBOOKS: RunbookDefinition[] = [
     }),
   },
   {
+    id: "campaign.sendWebinarStartingSoon",
+    name: "Send webinar starting soon campaign",
+    description:
+      "Schedules or dry-runs webinar starting-soon reminder sends for registrants.",
+    category: "campaigns",
+    requiredPermissions: ["campaigns.send", "automation.run"],
+    riskLevel: "high",
+    supportsDryRun: true,
+    requiresApproval: true,
+    parameterSchema: z.object({
+      templateKey: z.string().min(1),
+      audienceSegment: z.string().min(1),
+      idempotencyKey: z.string().min(8),
+    }),
+  },
+  {
+    id: "campaign.sendBeeReadyRecapWebinar",
+    name: "Send Bee Ready recap + webinar campaign",
+    description:
+      "Sends Bee Ready recap and webinar follow-up for active cohorts.",
+    category: "campaigns",
+    requiredPermissions: ["campaigns.send", "automation.run"],
+    riskLevel: "high",
+    supportsDryRun: true,
+    requiresApproval: true,
+    parameterSchema: z.object({
+      weekNumber: z.number().int().min(1).max(52),
+      templateKey: z.string().min(1),
+      audienceSegment: z.string().min(1),
+      idempotencyKey: z.string().min(8),
+    }),
+  },
+  {
     id: "beeready.announcement.create",
     name: "Create Buzzby announcement",
     description:

@@ -22,11 +22,26 @@ export default async function DashboardPage() {
       ? `$${metrics.revenue30d.toLocaleString()}`
       : "Pending";
 
+  const stripeStatus = metrics?.stripeConnected
+    ? metrics.stripeLivemode
+      ? "Connected (live)"
+      : "Connected (test)"
+    : "Not connected";
+
   const kpis = [
     {
       label: "Revenue (30d)",
       value: revenueDisplay,
-      hint: "Stripe aggregation lands in Commerce phase.",
+      hint: metrics?.stripeConnected
+        ? "Computed from Stripe succeeded payment intents."
+        : metrics?.stripeError || "Set STRIPE_SECRET_KEY to enable Stripe metrics.",
+    },
+    {
+      label: "Stripe Status",
+      value: stripeStatus,
+      hint: metrics?.stripeConnected
+        ? "Stripe API is reachable from admin backend."
+        : metrics?.stripeError || "Stripe key missing or invalid.",
     },
     {
       label: "Total Users",
@@ -42,6 +57,11 @@ export default async function DashboardPage() {
       label: "Admin Users",
       value: asCount(metrics?.adminUsers),
       hint: "Access records in adminUsers.",
+    },
+    {
+      label: "Active Subscriptions",
+      value: asCount(metrics?.activeSubscriptions),
+      hint: "Users with subscriptionStatus = active.",
     },
     {
       label: "Failed Jobs (24h)",

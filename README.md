@@ -26,6 +26,7 @@ cp .env.example .env.local
 2. Fill in Firebase Admin credentials in `.env.local`:
    - `FIREBASE_ADMIN_CLIENT_EMAIL`
    - `FIREBASE_ADMIN_PRIVATE_KEY`
+   - `STRIPE_SECRET_KEY` (required for Stripe revenue/health on dashboard)
    - Keep `FIREBASE_ADMIN_PROJECT_ID=beeapp-5c98b` to match `hivewebsite`.
 
 3. Start development server:
@@ -48,10 +49,20 @@ Open [http://localhost:3000](http://localhost:3000).
 - `/api/auth/csrf` - issues CSRF token for authenticated mutations
 - `/api/users/search` - admin user lookup from Firestore `adminUsers`
 - `/api/users/platform-search` - lookup users from main `users` collection
+- `/api/users/platform-update` - audited single-user role/status/tier update
+- `/api/users/platform-bulk-update` - audited bulk role/status/tier updates
 - `/api/users/grant-access` - audited admin role/status grant/update endpoint
+- `/api/campaigns/history` - campaign run history from automation jobs
+- `/api/campaigns/send` - create campaign send/dry-run runbook jobs
+- `/api/campaigns/templates` - campaign template catalog
+- `/api/campaigns/templates/[templateKey]/preview` - template preview payload
+- `/api/integrations/stripe/health` - Stripe connectivity status for billing admins
 - `/api/content/modules` - content management module definitions
 - `/api/tools/scripts` - script inventory from hivewebsite + hiveTools mapping
 - `/api/automation/jobs` - dry-run-first runbook execution scaffold
+- `/api/automation/jobs/[jobId]` - job detail endpoint
+- `/api/automation/jobs/[jobId]/approve` - approve job with reason
+- `/api/automation/jobs/[jobId]/cancel` - cancel job with reason
 
 ## Deploy to Vercel
 
@@ -62,8 +73,6 @@ Open [http://localhost:3000](http://localhost:3000).
 
 ## Next implementation steps
 
-- Add Stripe-backed 30-day revenue metrics for dashboard
-- Add role mutation flows for main platform `users` documents
 - Integrate script wrappers for campaign and Bee Ready operations
 - Add tests for sign-in allowlist and protected API access
 
