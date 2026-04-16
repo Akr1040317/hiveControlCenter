@@ -66,6 +66,16 @@ export default async function AutomationJobDetailPage({ params }: PageProps) {
         <p className="mt-2 text-sm text-[#dcdcef]">
           {String(job.outputSummary ?? "No summary available.")}
         </p>
+        <p className="mt-2 text-xs text-[#a4a4be]">
+          Command: {String((job.execution as { command?: string } | undefined)?.command ?? "—")}
+        </p>
+        <pre className="mt-3 max-h-72 overflow-auto rounded-md border border-[#2a2a46] bg-[#151526] p-3 text-xs text-[#dcdcef]">
+          {JSON.stringify(
+            (job.execution as { logs?: string[] } | undefined)?.logs ?? [],
+            null,
+            2,
+          )}
+        </pre>
       </article>
     </section>
   );

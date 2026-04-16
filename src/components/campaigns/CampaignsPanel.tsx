@@ -35,6 +35,13 @@ export function CampaignsPanel({ initialCampaignJobs }: CampaignsPanelProps) {
   const [previewHtml, setPreviewHtml] = useState<string>("");
   const [message, setMessage] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isUploadingInput, setIsUploadingInput] = useState(false);
+  const [uploadedInputRefId, setUploadedInputRefId] = useState<string>("");
+  const [uploadedRecipientCount, setUploadedRecipientCount] = useState<number | null>(
+    null,
+  );
+  const [manualRecipientsText, setManualRecipientsText] = useState("");
+  const [inputMode, setInputMode] = useState<"segment" | "manual">("segment");
   const [formState, setFormState] = useState({
     weekNumber: 2 as number | undefined,
     templateKey: "beeready-week2-article-live",
@@ -47,6 +54,11 @@ export function CampaignsPanel({ initialCampaignJobs }: CampaignsPanelProps) {
   const selectedTemplate = templates.find(
     (template) => template.key === formState.templateKey,
   );
+
+  const parseManualRecipients = () =>
+    [...manualRecipientsText.matchAll(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi)].map(
+      (match) => match[0].toLowerCase(),
+    );
 
   const refreshTemplates = async () => {
     const response = await fetch("/api/campaigns/templates");
@@ -129,6 +141,11 @@ export function CampaignsPanel({ initialCampaignJobs }: CampaignsPanelProps) {
             ? formState.weekNumber
             : undefined,
           scheduleAt: formState.scheduleAt || undefined,
+          audienceSegment:
+            inputMode === "segment" ? formState.audienceSegment : "manual",
+          inputRefId: inputMode === "manual" ? uploadedInputRefId || undefined : undefined,
+          manualRecipients:
+            inputMode === "manual" ? parseManualRecipients() : undefined,
         }),
       });
       const payload = (await response.json()) as { error?: string };
@@ -144,6 +161,42 @@ export function CampaignsPanel({ initialCampaignJobs }: CampaignsPanelProps) {
       );
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const handleInputUpload = async (file: File | null) => {
+    if (!file || !selectedTemplate) {
+      return;
+    }
+    setIsUploadingInput(true);
+    setMessage(null);
+    try {
+      const formData = new FormData();
+      formData.append("runbookId", selectedTemplate.runbookId);
+      formData.append("type", "campaign_recipients");
+      formData.append("file", file);
+
+      const response = await fetch("/api/automation/inputs/upload", {
+        method: "POST",
+        headers: {
+          "x-csrf-token": await getCsrfToken(),
+        },
+        body: formData,
+      });
+      const payload = (await response.json()) as {
+        error?: string;
+        automationInput?: { id: string; parsedCount?: number };
+      };
+      if (!response.ok) {
+        throw new Error(payload.error || "Upload failed");
+      }
+      setUploadedInputRefId(payload.automationInput?.id || "");
+      setUploadedRecipientCount(payload.automationInput?.parsedCount ?? null);
+      setMessage("Recipient file uploaded and parsed.");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Upload failed");
+    } finally {
+      setIsUploadingInput(false);
     }
   };
 
@@ -212,6 +265,7 @@ export function CampaignsPanel({ initialCampaignJobs }: CampaignsPanelProps) {
             className="hive-input px-3 py-2 text-sm"
             placeholder="Audience segment"
             required
+            disabled={inputMode === "manual"}
           />
           <input
             value={formState.scheduleAt}
@@ -243,6 +297,57 @@ export function CampaignsPanel({ initialCampaignJobs }: CampaignsPanelProps) {
             />
             Run in dry-run mode
           </label>
+          <div className="md:col-span-2 grid gap-2 rounded-md border border-[#2a2a46] bg-[#151526] p-3">
+            <p className="text-sm text-white">Input source</p>
+            <label className="text-xs text-[#dcdcef]">
+              <input
+                type="radio"
+                checked={inputMode === "segment"}
+                onChange={() => setInputMode("segment")}
+                className="mr-2"
+              />
+              Use audience segment
+            </label>
+            <label className="text-xs text-[#dcdcef]">
+              <input
+                type="radio"
+                checked={inputMode === "manual"}
+                onChange={() => setInputMode("manual")}
+                className="mr-2"
+              />
+              Manual recipients (paste or upload CSV/PDF/TXT)
+            </label>
+
+            {inputMode === "manual" ? (
+              <div className="grid gap-2">
+                <textarea
+                  value={manualRecipientsText}
+                  onChange={(event) => setManualRecipientsText(event.target.value)}
+                  className="hive-input min-h-24 px-3 py-2 text-xs"
+                  placeholder="Paste one email per line or comma-separated list"
+                />
+                <input
+                  type="file"
+                  accept=".csv,.pdf,.txt"
+                  onChange={(event) =>
+                    void handleInputUpload(event.target.files?.[0] ?? null)
+                  }
+                  className="hive-input px-3 py-2 text-xs"
+                />
+                {isUploadingInput ? (
+                  <p className="text-xs text-[#a4a4be]">Uploading input...</p>
+                ) : null}
+                {uploadedInputRefId ? (
+                  <p className="text-xs text-[#a4a4be]">
+                    Uploaded input ref: {uploadedInputRefId}
+                    {typeof uploadedRecipientCount === "number"
+                      ? ` (${uploadedRecipientCount} parsed emails)`
+                      : ""}
+                  </p>
+                ) : null}
+              </div>
+            ) : null}
+          </div>
           <div className="md:col-span-2">
             <button
               type="submit"

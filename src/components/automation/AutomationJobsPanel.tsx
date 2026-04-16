@@ -130,17 +130,20 @@ export function AutomationJobsPanel() {
                   </td>
                   <td className="py-2">
                     <div className="flex gap-2">
-                      <button
-                        type="button"
-                        onClick={() => void runAction(job.id, "approve")}
-                        className="hive-primary-btn px-2 py-1 text-xs"
-                      >
-                        Approve
-                      </button>
+                      {job.isDryRun || job.status !== "pending_approval" ? null : (
+                        <button
+                          type="button"
+                          onClick={() => void runAction(job.id, "approve")}
+                          className="hive-primary-btn px-2 py-1 text-xs"
+                        >
+                          Approve
+                        </button>
+                      )}
                       <button
                         type="button"
                         onClick={() => void runAction(job.id, "cancel")}
                         className="hive-secondary-btn px-2 py-1 text-xs"
+                        disabled={job.status === "completed" || job.status === "failed"}
                       >
                         Cancel
                       </button>

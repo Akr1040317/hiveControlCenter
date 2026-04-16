@@ -26,7 +26,9 @@ cp .env.example .env.local
 2. Fill in Firebase Admin credentials in `.env.local`:
    - `FIREBASE_ADMIN_CLIENT_EMAIL`
    - `FIREBASE_ADMIN_PRIVATE_KEY`
+   - `FIREBASE_ADMIN_STORAGE_BUCKET`
    - `STRIPE_SECRET_KEY` (required for Stripe revenue/health on dashboard)
+   - `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `SMTP_PASS`, `FROM_EMAIL`
    - Keep `FIREBASE_ADMIN_PROJECT_ID=beeapp-5c98b` to match `hivewebsite`.
 
 3. Start development server:
@@ -47,6 +49,7 @@ Open [http://localhost:3000](http://localhost:3000).
 - `/api/auth/session` - verifies Firebase ID token, enforces allowlist, sets
   secure cookie
 - `/api/auth/csrf` - issues CSRF token for authenticated mutations
+- `/api/automation/inputs/upload` - upload CSV/PDF/TXT inputs for runbooks
 - `/api/users/search` - admin user lookup from Firestore `adminUsers`
 - `/api/users/platform-search` - lookup users from main `users` collection
 - `/api/users/platform-update` - audited single-user role/status/tier update
@@ -82,3 +85,9 @@ This control center is intentionally separate from `hivewebsite` and uses the
 same Firebase project (`beeapp-5c98b`) for authentication and data access.
 The scripts in `hiveTools` also target this same Firebase project via service
 account credentials.
+
+Manual runbook inputs:
+- Campaign and pronunciation runbooks support manual values and uploaded
+  documents (`.csv`, `.pdf`, `.txt`) via `automationInputs` records.
+- Uploads are stored in Firebase Storage and parsed values are persisted in
+  Firestore for repeatable, auditable execution on Vercel.

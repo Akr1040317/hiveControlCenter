@@ -54,6 +54,8 @@ export const RUNBOOKS: RunbookDefinition[] = [
     parameterSchema: z.object({
       templateKey: z.string().min(1),
       audienceSegment: z.string().min(1),
+      inputRefId: z.string().min(1).optional(),
+      manualRecipients: z.array(z.string().email()).optional(),
       idempotencyKey: z.string().min(8),
     }),
   },
@@ -136,6 +138,8 @@ export const RUNBOOKS: RunbookDefinition[] = [
     parameterSchema: z.object({
       wordSetRef: z.string().min(1),
       provider: z.enum(["google_tts", "manual"]).default("google_tts"),
+      inputRefId: z.string().min(1).optional(),
+      manualWords: z.array(z.string().min(1)).optional(),
       idempotencyKey: z.string().min(8),
     }),
   },

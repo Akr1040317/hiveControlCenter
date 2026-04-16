@@ -12,6 +12,8 @@ const sendCampaignSchema = z.object({
   weekNumber: z.number().int().min(1).max(52).optional(),
   templateKey: z.string().min(1),
   audienceSegment: z.string().min(1),
+  inputRefId: z.string().min(1).optional(),
+  manualRecipients: z.array(z.string().email()).optional(),
   idempotencyKey: z.string().min(8),
   scheduleAt: z.string().optional(),
   isDryRun: z.boolean().optional().default(true),
@@ -88,6 +90,10 @@ export async function POST(request: Request) {
           : {}),
         templateKey: payload.templateKey,
         audienceSegment: payload.audienceSegment,
+        ...(payload.inputRefId ? { inputRefId: payload.inputRefId } : {}),
+        ...(payload.manualRecipients
+          ? { manualRecipients: payload.manualRecipients }
+          : {}),
         idempotencyKey: payload.idempotencyKey,
         ...(payload.scheduleAt ? { scheduleAt: payload.scheduleAt } : {}),
       },

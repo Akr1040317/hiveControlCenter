@@ -3,6 +3,7 @@ import "server-only";
 import { cert, getApps, initializeApp, type App } from "firebase-admin/app";
 import { getAuth } from "firebase-admin/auth";
 import { getFirestore } from "firebase-admin/firestore";
+import { getStorage } from "firebase-admin/storage";
 
 function getPrivateKey() {
   const key = process.env.FIREBASE_ADMIN_PRIVATE_KEY;
@@ -53,4 +54,12 @@ export function getAdminAuth() {
 
 export function getAdminDb() {
   return getFirestore(getAdminApp());
+}
+
+export function getAdminStorageBucket() {
+  const explicitBucket = process.env.FIREBASE_ADMIN_STORAGE_BUCKET;
+  const fallbackBucket =
+    process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET ||
+    `${process.env.FIREBASE_ADMIN_PROJECT_ID}.appspot.com`;
+  return getStorage(getAdminApp()).bucket(explicitBucket || fallbackBucket);
 }

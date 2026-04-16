@@ -1,5 +1,6 @@
 import { listRunbooks } from "@/lib/jobs/engine";
 import { AutomationJobsPanel } from "@/components/automation/AutomationJobsPanel";
+import { PronunciationRunPanel } from "@/components/automation/PronunciationRunPanel";
 
 export default async function AutomationPage() {
   const runbooks = await listRunbooks();
@@ -49,6 +50,7 @@ export default async function AutomationPage() {
         </div>
       ))}
 
+      <PronunciationRunPanel />
       <AutomationJobsPanel />
     </section>
   );
