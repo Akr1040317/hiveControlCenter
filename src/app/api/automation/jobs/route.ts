@@ -100,9 +100,10 @@ export async function POST(request: Request) {
       errorMessage: error instanceof Error ? error.message : "Unknown error",
     });
 
+    const message = error instanceof Error ? error.message : "Job creation failed";
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Job creation failed" },
-      { status: 400 },
+      { error: message },
+      { status: message === "AUTOMATION_DISABLED" ? 423 : 400 },
     );
   }
 }

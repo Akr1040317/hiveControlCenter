@@ -92,6 +92,8 @@ export async function POST(request: Request, context: RouteParams) {
         ? 404
         : message === "JOB_NOT_RETRYABLE"
           ? 409
+          : message === "AUTOMATION_DISABLED"
+            ? 423
           : 500;
     return NextResponse.json({ error: message }, { status: statusCode });
   }

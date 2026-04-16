@@ -1,6 +1,6 @@
 import "server-only";
 
-import { FieldValue } from "firebase-admin/firestore";
+import { FieldValue, Timestamp } from "firebase-admin/firestore";
 
 import { getAdminDb } from "@/lib/firebase/admin";
 import type { AdminSession } from "@/types/auth";
@@ -162,6 +162,61 @@ export async function listRunbooks(): Promise<RunbookDefinition[]> {
   return RUNBOOKS;
 }
 
+export type AutomationOpsOverview = {
+  generatedAt: string;
+  liveExecutionEnabled: boolean;
+  pendingApproval: number;
+  runningJobs: number;
+  failedJobs24h: number;
+  queuedJobs: number;
+};
+
+export async function getAutomationOpsOverview(): Promise<AutomationOpsOverview> {
+  const adminDb = getAdminDb();
+  const now = Date.now();
+  const cutoff24h = Timestamp.fromDate(new Date(now - 24 * 60 * 60 * 1000));
+  const liveExecutionEnabled =
+    process.env.ADMIN_CENTER_AUTOMATION_ENABLED !== "false";
+
+  const [pendingApproval, runningJobs, failedJobs24h, queuedJobs] =
+    await Promise.all([
+      adminDb
+        .collection("automationJobRuns")
+        .where("status", "==", "pending_approval")
+        .count()
+        .get()
+        .then((agg) => agg.data().count),
+      adminDb
+        .collection("automationJobRuns")
+        .where("status", "==", "running")
+        .count()
+        .get()
+        .then((agg) => agg.data().count),
+      adminDb
+        .collection("automationJobRuns")
+        .where("status", "==", "failed")
+        .where("updatedAt", ">=", cutoff24h)
+        .count()
+        .get()
+        .then((agg) => agg.data().count),
+      adminDb
+        .collection("automationJobRuns")
+        .where("status", "==", "queued")
+        .count()
+        .get()
+        .then((agg) => agg.data().count),
+    ]);
+
+  return {
+    generatedAt: new Date().toISOString(),
+    liveExecutionEnabled,
+    pendingApproval,
+    runningJobs,
+    failedJobs24h,
+    queuedJobs,
+  };
+}
+
 export async function listRecentJobs(limit = 20): Promise<AutomationJobRecord[]> {
   const adminDb = getAdminDb();
   const snapshot = await adminDb
@@ -320,6 +375,11 @@ export async function createDryRunJob(input: {
   }
 
   const isDryRun = input.isDryRun ?? true;
+  const liveExecutionEnabled =
+    process.env.ADMIN_CENTER_AUTOMATION_ENABLED !== "false";
+  if (!isDryRun && !liveExecutionEnabled) {
+    throw new Error("AUTOMATION_DISABLED");
+  }
   const adminDb = getAdminDb();
   const canExecuteNow = canExecuteRunbook(runbook.id);
   const nextStatus = isDryRun
@@ -395,6 +455,9 @@ export async function retryJob(input: {
   const status = String(original.status ?? "");
   if (status !== "failed" && status !== "cancelled") {
     throw new Error("JOB_NOT_RETRYABLE");
+  }
+  if (!original.isDryRun && process.env.ADMIN_CENTER_AUTOMATION_ENABLED === "false") {
+    throw new Error("AUTOMATION_DISABLED");
   }
 
   const runbookId = String(original.runbookId ?? "");

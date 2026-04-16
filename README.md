@@ -29,6 +29,7 @@ cp .env.example .env.local
    - `FIREBASE_ADMIN_STORAGE_BUCKET`
    - `STRIPE_SECRET_KEY` (required for Stripe revenue/health on dashboard)
    - `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `SMTP_PASS`, `FROM_EMAIL`
+   - `ADMIN_CENTER_AUTOMATION_ENABLED=true` (set `false` to pause live executions)
    - Keep `FIREBASE_ADMIN_PROJECT_ID=beeapp-5c98b` to match `hivewebsite`.
 
 3. Start development server:
