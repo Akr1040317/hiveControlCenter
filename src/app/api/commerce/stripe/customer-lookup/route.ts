@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { assertPermission, getAdminSession } from "@/lib/auth/guards";
 import { lookupStripeCustomers } from "@/lib/integrations/stripeAdmin";
+import { getErrorMessage, reportAdminError } from "@/lib/observability/errorReporting";
 
 export async function GET(request: Request) {
   const session = await getAdminSession();
@@ -25,8 +26,18 @@ export async function GET(request: Request) {
     const customers = await lookupStripeCustomers(query);
     return NextResponse.json({ customers, count: customers.length });
   } catch (error) {
+    const message = getErrorMessage(error);
+    await reportAdminError({
+      source: "api",
+      route: "/api/commerce/stripe/customer-lookup",
+      message,
+      errorCode: "STRIPE_CUSTOMER_LOOKUP_FAILED",
+      actorUid: session.uid,
+      actorEmail: session.email,
+      metadata: { queryLength: query.length },
+    });
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Lookup failed" },
+      { error: message },
       { status: 400 },
     );
   }

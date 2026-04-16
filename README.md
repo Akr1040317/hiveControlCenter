@@ -67,6 +67,7 @@ Open [http://localhost:3000](http://localhost:3000).
 - `/api/commerce/stripe/payment-failures` - list recent failed payment intents
 - `/api/commerce/stripe/webhook-health` - webhook telemetry summary from Firestore
 - `/api/commerce/stripe/resync` - one-click user billing resync from Stripe (audited)
+- `/api/observability/slo` - SLO snapshot for reliability, queue, security, and billing signals
 - `/api/content/modules` - content management module definitions
 - `/api/tools/scripts` - script inventory from hivewebsite + hiveTools mapping
 - `/api/automation/jobs` - dry-run-first runbook execution scaffold
@@ -81,10 +82,9 @@ Open [http://localhost:3000](http://localhost:3000).
 3. Add production domain `admin.hivewebsite.com`.
 4. Keep `ADMIN_CENTER_READ_ONLY_MODE=true` for initial launch safety.
 
-## Next implementation steps
+## Testing
 
-- Integrate script wrappers for campaign and Bee Ready operations
-- Add tests for sign-in allowlist and protected API access
+- `npm test` - Vitest checks for RBAC permissions, runbook schema validation, and rate-limit behavior.
 
 ## Notes
 

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { assertPermission, getAdminSession } from "@/lib/auth/guards";
 import { listStripePaymentFailures } from "@/lib/integrations/stripeAdmin";
+import { getErrorMessage, reportAdminError } from "@/lib/observability/errorReporting";
 
 export async function GET(request: Request) {
   const session = await getAdminSession();
@@ -23,8 +24,18 @@ export async function GET(request: Request) {
     const failures = await listStripePaymentFailures(clampedDays);
     return NextResponse.json({ failures, count: failures.length, days: clampedDays });
   } catch (error) {
+    const message = getErrorMessage(error);
+    await reportAdminError({
+      source: "api",
+      route: "/api/commerce/stripe/payment-failures",
+      message,
+      errorCode: "STRIPE_PAYMENT_FAILURES_FETCH_FAILED",
+      actorUid: session.uid,
+      actorEmail: session.email,
+      metadata: { days: clampedDays },
+    });
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Failed to list payment failures" },
+      { error: message },
       { status: 400 },
     );
   }

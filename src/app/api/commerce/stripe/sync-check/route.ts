@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { assertPermission, getAdminSession } from "@/lib/auth/guards";
 import { getStripeSubscriptionSyncCheck } from "@/lib/integrations/stripeAdmin";
+import { getErrorMessage, reportAdminError } from "@/lib/observability/errorReporting";
 
 export async function GET(request: Request) {
   const session = await getAdminSession();
@@ -25,8 +26,16 @@ export async function GET(request: Request) {
     const result = await getStripeSubscriptionSyncCheck(identifier);
     return NextResponse.json(result);
   } catch (error) {
-    const message =
-      error instanceof Error ? error.message : "Sync check failed";
+    const message = getErrorMessage(error);
+    await reportAdminError({
+      source: "api",
+      route: "/api/commerce/stripe/sync-check",
+      message,
+      errorCode: "STRIPE_SYNC_CHECK_FAILED",
+      actorUid: session.uid,
+      actorEmail: session.email,
+      metadata: { identifierLength: identifier.length },
+    });
     return NextResponse.json(
       { error: message },
       { status: message === "USER_NOT_FOUND" ? 404 : 400 },

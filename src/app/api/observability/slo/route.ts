@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
 
 import { assertPermission, getAdminSession } from "@/lib/auth/guards";
-import { getStripeWebhookHealth } from "@/lib/integrations/stripeAdmin";
 import { getErrorMessage, reportAdminError } from "@/lib/observability/errorReporting";
+import { getSloSnapshot } from "@/lib/observability/slo";
 
 export async function GET() {
   const session = await getAdminSession();
@@ -11,21 +11,21 @@ export async function GET() {
   }
 
   try {
-    assertPermission(session, "billing.read");
+    assertPermission(session, "security.read");
   } catch {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
   try {
-    const health = await getStripeWebhookHealth();
-    return NextResponse.json(health);
+    const slo = await getSloSnapshot();
+    return NextResponse.json(slo);
   } catch (error) {
     const message = getErrorMessage(error);
     await reportAdminError({
       source: "api",
-      route: "/api/commerce/stripe/webhook-health",
+      route: "/api/observability/slo",
       message,
-      errorCode: "STRIPE_WEBHOOK_HEALTH_FETCH_FAILED",
+      errorCode: "SLO_FETCH_FAILED",
       actorUid: session.uid,
       actorEmail: session.email,
       metadata: null,

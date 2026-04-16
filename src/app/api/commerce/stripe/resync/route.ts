@@ -4,6 +4,7 @@ import { z } from "zod";
 import { assertPermission, getAdminSession } from "@/lib/auth/guards";
 import { logAdminAction } from "@/lib/audit/logger";
 import { resyncUserBillingState } from "@/lib/integrations/stripeAdmin";
+import { getErrorMessage, reportAdminError } from "@/lib/observability/errorReporting";
 import { assertRateLimit } from "@/lib/security/rateLimit";
 import { assertValidCsrf } from "@/lib/security/csrf";
 
@@ -92,7 +93,16 @@ export async function POST(request: Request) {
       errorMessage: error instanceof Error ? error.message : "Unknown error",
     });
 
-    const message = error instanceof Error ? error.message : "Resync failed";
+    const message = getErrorMessage(error);
+    await reportAdminError({
+      source: "api",
+      route: "/api/commerce/stripe/resync",
+      message,
+      errorCode: "BILLING_RESYNC_FAILED",
+      actorUid: session.uid,
+      actorEmail: session.email,
+      metadata: { identifier: parsed.data.identifier },
+    });
     return NextResponse.json(
       { error: message },
       { status: message === "USER_NOT_FOUND" ? 404 : 400 },
