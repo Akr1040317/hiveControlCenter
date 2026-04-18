@@ -10,6 +10,7 @@ const NAV_ITEMS = [
   { href: "/automation", label: "Automation" },
   { href: "/tools-center", label: "Tools Center" },
   { href: "/observability", label: "Observability" },
+  { href: "/launch-readiness", label: "Launch Readiness" },
   { href: "/settings", label: "Settings" },
 ];
 

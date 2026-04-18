@@ -68,6 +68,7 @@ Open [http://localhost:3000](http://localhost:3000).
 - `/api/commerce/stripe/webhook-health` - webhook telemetry summary from Firestore
 - `/api/commerce/stripe/resync` - one-click user billing resync from Stripe (audited)
 - `/api/observability/slo` - SLO snapshot for reliability, queue, security, and billing signals
+- `/launch-readiness` - go-live gate with RBAC matrix, staging checklist, rollback runbook, smoke-test instructions
 - `/api/content/modules` - content management module definitions
 - `/api/tools/scripts` - script inventory from hivewebsite + hiveTools mapping
 - `/api/automation/jobs` - dry-run-first runbook execution scaffold
@@ -85,6 +86,7 @@ Open [http://localhost:3000](http://localhost:3000).
 ## Testing
 
 - `npm test` - Vitest checks for RBAC permissions, runbook schema validation, and rate-limit behavior.
+- `npm run smoke:prod` - production smoke tests (requires `ADMIN_BASE_URL`, optional `ADMIN_SESSION_COOKIE`, `ADMIN_CSRF_TOKEN`).
 
 ## Notes
 
